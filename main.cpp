@@ -4,11 +4,64 @@
 #include <vector>
 #include <utility>
 #include <queue>
-#include <stack>
+#include <algorithm>
+#include <chrono>
+
+
+struct resposta {
+	double distancia;
+	double maior_aresta;
+
+	resposta() {
+		distancia = 0;
+		maior_aresta = -1;
+	}
+};
 
 using namespace std;
 
 typedef pair <double, double>* pares;
+
+double calcula_maior_aresta(double** matriz, vector<int> rota) {
+
+	double maior_aresta = -1;
+	int n = rota.size();
+	for (int i = 1; i < n; i++) {
+		if (matriz[rota[i - 1]][rota[i]] > maior_aresta) {
+			maior_aresta = matriz[rota[i - 1]][rota[i]];
+		}
+	}
+	return maior_aresta;
+}
+
+vector<int> OPT(double** matriz, vector<int> rota, int tamanho) {
+	
+	bool melhorou = true;
+	double valor_antigo, valor_novo;
+	valor_antigo = calcula_maior_aresta(matriz, rota);
+
+	while (melhorou) {
+
+		melhorou = false;
+
+		for (int i = 1; i < tamanho - 1; i++) {
+			for (int j = i + 1;j < tamanho; j++) {
+				vector<int> nova_rota = rota;
+				reverse(nova_rota.begin() + i, nova_rota.begin() + j + 1);
+				valor_novo = calcula_maior_aresta(matriz, nova_rota);
+
+				if (valor_novo < valor_antigo) {
+					rota = nova_rota;
+					valor_antigo = valor_novo;
+					melhorou = true;
+					cout << "Melhorou pra :" << valor_novo << endl;
+				}
+			}
+		}
+	}
+	cout << "Apos aplica a OPT a maior aresta ficou com o valor : " << valor_antigo << endl;
+	return rota;
+}
 
 double pitagoras(const double &x1, const double& x2, const double& y1, const double& y2) {
 
@@ -18,7 +71,7 @@ double pitagoras(const double &x1, const double& x2, const double& y1, const dou
 	return sqrt(hip);
 }
 
-void calcula_distancias(const pares &cord, double** &matriz, const int &n_vertices, double &low, double &high) {
+void calcula_distancias(const pares &cord, double** &matriz, const int &n_vertices) {
 	// preenche a matriz de adjacencia com o peso dos vertices;
 	for (int i = 0; i < n_vertices; i++) {
 		for (int j = 0; j < n_vertices; j++) {
@@ -27,12 +80,6 @@ void calcula_distancias(const pares &cord, double** &matriz, const int &n_vertic
 			}
 			else {
 				matriz[i][j] = pitagoras(cord[i].first,cord[j].first,cord[i].second,cord[j].second);
-				if (matriz[i][j] > high) {
-					high = matriz[i][j];
-				}
-				if (matriz[i][j] < low and matriz[i][j] != 0) {
-					low = matriz[i][j];
-				}
 			}
 		}
 	}
@@ -47,13 +94,15 @@ void imprimi(double**& matriz) {
 	}
 }
 
-double vizinho_proximo(double** &matriz,const int &origem,const int &tamanho) {
+resposta vizinho_proximo(double** &matriz,const int &origem,const int &tamanho) {
 	 
 	double distancia_total = 0;
 
 	vector<bool> visitados(tamanho, false);
 	vector<int> ordem;
 	
+	resposta dados;
+
 	ordem.push_back(origem);
 	visitados[origem] = true;
 	int atual = origem;
@@ -72,20 +121,25 @@ double vizinho_proximo(double** &matriz,const int &origem,const int &tamanho) {
 		}
 		ordem.push_back(noh);
 		visitados[noh] = true;
-		distancia_total += distancia;
+		dados.distancia += distancia;
 		atual = noh;
+
+		if (distancia > dados.maior_aresta) {
+			dados.maior_aresta = distancia;
+		}
 	}
 
 	ordem.push_back(origem);
-	distancia_total += matriz[atual][origem];
+	dados.distancia += matriz[atual][origem];
 
-	return distancia_total;
+	return dados;
 }
 
-double insercao(double**& matriz,const int& origem, int tamanho) {
+resposta insercao(double**& matriz,const int& origem, int tamanho) {
 
 	vector<bool> visitado(tamanho, false);
 	vector<int> rota;
+	resposta resultado;
 
 	visitado[origem] = true;
 	rota.push_back(origem);
@@ -100,7 +154,7 @@ double insercao(double**& matriz,const int& origem, int tamanho) {
 		}
 	}
 
-
+	
 	double distancia = maior_dist * 2; //Ida e volta   0 - 1 - 0
 	visitado[maior] = true;
 	rota.push_back(maior);
@@ -144,68 +198,30 @@ double insercao(double**& matriz,const int& origem, int tamanho) {
 			}
 		}
 		rota.insert(rota.begin() + primeiro_no + 1, proximo_no);
-		distancia += menor_impacto;
+		resultado.distancia += menor_impacto;
 		visitado[proximo_no] = true;
 	}
 
-	return distancia;
-}
+	// Procura a maior aresta na rota definida
 
-bool dfs(double** &matriz, int tamanho, double filtro) {
+	resultado.maior_aresta = calcula_maior_aresta(matriz, rota);
 
-	vector<bool> visitado(tamanho, false);
-	stack<int> pilha;
-	pilha.push(0);
-	visitado[0] = true;
+	cout << "Usando a inserção  temos como caminho minimo : " << resultado.distancia << " e com a maior aresta sendo de peso : " << resultado.maior_aresta << endl;
 
-	int atual;
-	int contador = 0;
-
-	while (!pilha.empty()) {
-		atual = pilha.top();
-		pilha.pop();
-		contador++;
-
-		for (int i = 0; i < tamanho; i++) {
-			if (matriz[atual][i] < filtro and matriz[atual][i] > 0 and !visitado[i]) {
-				pilha.push(i);
-				visitado[i] = true;
-			}
-		}
-	}
-
-	return tamanho == contador;
-
-}
-
-double 	encontra_menor_distancia_maxima(double** & matriz,double low,double high,int tamanho) {
-
-	double epsilon = 1e-6; // Precisão da busca binária
-	double mid;
-	int contador = 0;
-
-	while (contador < 100 and high - low > epsilon) {
-		contador++;
-		mid = (high + low) / 2;
-		cout << "HIGH: " << high << " LOW: " << low << " MID: " << mid << endl;
-
-		if (dfs(matriz, 5, mid)) {
-			high = mid;
-		}
-		else {
-			low = mid;
-		}
-	}
-	return mid;
+	OPT(matriz, rota,tamanho);
+	
+	return resultado;
 }
 
 
 int main() {
 
+	auto start = chrono::high_resolution_clock::now();
+
 	ifstream arquivo("C:\\Users\\arthu\\OneDrive\\Área de Trabalho\\texto.txt");
 	string info;
 	int n_vertices;
-	
+		
 	if (!arquivo.is_open()) {
 		cerr << "Erro ao abrir o arquivo." << endl;
 		return 1;
@@ -230,20 +246,20 @@ int main() {
 		matriz[i] = new double[n_vertices];
 		arquivo >> lixo;
 		arquivo >> cord[i].first >> cord[i].second; // preenche o vetor com as cordenadas dos pontos
-		//cout << cord[i].first << " " << cord[i].second << endl;
+	//cout << cord[i].first << " " << cord[i].second << endl;
 	} // aloca a matriz dinamicamente
-
-
-	double low = DBL_MAX;
-	double high = -1 ;
 	
-	calcula_distancias(cord, matriz, n_vertices,low,high);
+	calcula_distancias(cord, matriz, n_vertices);
 	delete[] cord;
-	double menor = encontra_menor_distancia_maxima(matriz, low, high, n_vertices);
 	
-	//cout << endl << "O menor caminho com a origem : " << vizinho_proximo(matriz, 0, n_vertices) << endl;
-	//cout << endl << "O menor caminho com a origem : " << insercao(matriz, 0, n_vertices) << endl;
+	resposta resultado = vizinho_proximo(matriz, 0, n_vertices);
+	cout << "Usando o vizinho mais proximo temos como caminho minimo : " << resultado.distancia << " e com a maior aresta sendo de peso : " << resultado.maior_aresta << endl;
+	resposta resultado2 = insercao(matriz, 0, n_vertices);
+
 	
-	
+	auto end = chrono::high_resolution_clock::now();
+	auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
+	cout << "O código demorou " << duration.count() << " ms para rodar." << endl;
+
 	return 0;
 }
